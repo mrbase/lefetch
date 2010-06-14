@@ -1,0 +1,12 @@
+lefetch requirements:
+
+- cron access
+- php5
+- wget
+- sqlite
+
+
+cron setup:
+# will update feeds every 30 minutes
+0,30 * * * * /path/to/lefetch.php
+
