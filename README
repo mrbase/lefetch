@@ -2,9 +2,16 @@ lefetch requirements:
 
 - cron access
 - php5
-- wget
 - sqlite
 
+configuration:
+in the top of lefetch.php you can set:
+- the name of the sqlite database
+- the target directory (where to store the files)
+- and the feeds to watch
+
+install, just run
+$ ./lefetch/db.php
 
 cron setup:
 # will update feeds every 30 minutes
