@@ -32,7 +32,7 @@ function download($file, $target) {
   );
 
   if (is_file($out)) {
-    continue;
+    return;
   }
 
   $src = fopen($file, 'r');
