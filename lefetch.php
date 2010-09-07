@@ -1,30 +1,41 @@
 #!/usr/bin/env php
 <?php
 
-// just add feed url's to download from other blogs
-$feeds = array(
-  'http://www.berri.dk/feed/',
-);
+// load configuration
+$cfg = dirname(__FILE__) . '/config.php';
+if (!is_file($cfg)) {
+  die("
+woops!
+ the configuration file is missing.
+ copy the sample-config.php file to config.php
+ edit the settings within and try agian.
 
-// where to put the downloaded files
-$target = dirname(__FILE__) . '/library/';
+");
+}
 
-// if you change this you should also change the path in the "db.php" file.
-$sqlite = dirname(__FILE__) . '/lefetch.db';
+require $cfg;
 
-// add your email address here to recive an email when new music has ben downloaded.
-$mailto = '';
+// check database
+if (!is_file($sqlite)) {
+  die("
+woops!
+ remember to run 'db.php' to create the sqlite database.
 
-// that's it for settings...
+");
+}
+
+define('DEBUG', ((isset($argv[1]) && $argv[1] = '--debug') ? true : false));
 
 /**
  * downloader function
+ * uses stream_copy_to_stream to avoid running into memory limits or wget system calls
  *
  * @param string $file
  * @param string $target
+ * @param int $date
  * @return int
  */
-function download($file, $target) {
+function download($file, $target, $date) {
   $out = $target .  str_replace(
     array('"', ' '),
     array('', '_',),
@@ -38,7 +49,18 @@ function download($file, $target) {
   $src = fopen($file, 'r');
   $dest = fopen($out, 'wb+');
 
-  return stream_copy_to_stream($src, $dest);
+  if (DEBUG) { echo "- downloading:\n    {$file} to\n    {$out}\n"; }
+
+  $result = (bool) stream_copy_to_stream($src, $dest);
+
+  // close file handlers
+  fclose($src);
+  fclose($dest);
+
+  // set file time.
+  touch($out, $date, $date);
+
+  return $result;
 }
 
 // open up sqlite database
@@ -46,6 +68,8 @@ $db = new SQLiteDatabase($sqlite);
 if (!$db instanceof  SQLiteDatabase) {
   die("hey hey... the database {$sqlite} could not be opened.. i'm bailing out.\n");
 }
+
+if (DEBUG) { echo "\nStarting feed fetcher run...\n"; }
 
 $new = array();
 foreach ($feeds as $feed) {
@@ -55,8 +79,11 @@ foreach ($feeds as $feed) {
   $updated = $rss->channel->lastBuildDate ? strtotime($rss->channel->lastBuildDate) : strtotime($rss->channel->pubDate);
   $base = $target . $title . '/';
 
+  if (DEBUG) { echo "- parsing '{$title}' target dir is: {$base}\n"; }
+
   // create target dir if it does not exist
   if (!is_dir($base)) {
+    if (DEBUG) { echo "- creating target dir: {$base}\n"; }
     mkdir($base, 0775, true);
   }
 
@@ -93,6 +120,7 @@ foreach ($feeds as $feed) {
 
   // only process new posts
   if ($record->updated_at >= $updated) {
+    if (DEBUG) { echo "- no new feed entries, skipping to next feed.\n"; }
     continue;
   }
 
@@ -108,7 +136,9 @@ foreach ($feeds as $feed) {
   $new[$title] = array();
   foreach ($rss->channel->item as $item) {
     // skip feeds that has not changed since last run.
-    if (strtotime($item->pubDate) <= $record->updated_at) {
+    $published = strtotime($item->pubDate);
+    if ($published <= $record->updated_at) {
+      if (DEBUG) { echo "- not a new entry, skipping.\n"; }
       continue;
     }
 
@@ -121,7 +151,7 @@ foreach ($feeds as $feed) {
 
       if (count($matches[1])) {
         foreach ($matches[1] as $file) {
-          download($file, $target . $title . '/');
+          download($file, $target . $title . '/', $published);
         }
       }
     }
@@ -135,7 +165,7 @@ foreach ($feeds as $feed) {
         continue;
       }
 
-      download($file, $target . $title . '/');
+      download($file, $target . $title . '/', $published);
     }
   }
 
@@ -143,6 +173,8 @@ foreach ($feeds as $feed) {
     unset($new[$title]);
   }
 }
+
+if (DEBUG) { echo "- out of feeds.\n"; }
 
 // if an email address is set, send a notification with any new files fetched
 if ($mailto && count($new)) {
@@ -156,5 +188,8 @@ if ($mailto && count($new)) {
     }
   }
 
+  if (DEBUG) { echo "- status mail sent to {$mailto}\n"; }
   mail($mailto, $title, $content);
 }
+
+if (DEBUG) { echo "we are done! over and out.\n\n"; }
