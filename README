@@ -17,3 +17,12 @@ cron setup:
 # will update feeds every 30 minutes
 0,30 * * * * /path/to/lefetch.php
 
+
+testing feature:
+make sure your database is installed and you have feeds to test on in the
+configuration file.
+
+open a shell and type:
+$ ./lefetch.php --debug
+
+you will now get a bunch of information on what's going on while the process runs.
