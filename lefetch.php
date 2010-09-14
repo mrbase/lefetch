@@ -142,7 +142,7 @@ foreach ($feeds as $feed) {
       continue;
     }
 
-    // we need to set the content namepace to get embeded media files
+    // set the content namepace to get embeded media files
     $item->registerXPathNamespace('content', 'http://purl.org/rss/1.0/modules/content/');
     $encoded = $item->xpath('content:encoded');
 
@@ -151,6 +151,17 @@ foreach ($feeds as $feed) {
 
       if (count($matches[1])) {
         foreach ($matches[1] as $file) {
+          // need to make shure the url is valid, otherwise the download will fail
+          $file = html_entity_decode(urldecode($file), ENT_NOQUOTES, 'UTF-8');
+          $parts = parse_url($file);
+
+          $path = explode('/', $parts['path']);
+          for($i=0, $c=count($path); $i<$c; $i++) {
+            $path[$i] = rawurlencode($path[$i]);
+          }
+
+          $file = $parts['scheme'] . '://' . $parts['host'] . implode('/', $path);
+
           download($file, $target . $title . '/', $published);
         }
       }
